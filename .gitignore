@@ -1,4 +1,5 @@
 .system/
+teams-notify/.default_webhook
 */__pycache__/
 *.py[cod]
 .DS_Store

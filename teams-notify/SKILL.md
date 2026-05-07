@@ -14,6 +14,9 @@ Use this skill to run or monitor a task and send a Teams webhook notification fo
 - A log file if watching an existing PID and full INFO logs are required.
 
 Never hard-code a webhook into repository files. Treat webhooks as secrets.
+If a persistent local default is needed, store it in `teams-notify/.default_webhook`;
+that file is ignored by git and used only when `--webhook` and `TEAMS_WEBHOOK_URL`
+are absent.
 
 ## Workflow
 
@@ -68,6 +71,8 @@ python /root/.codex/skills/teams-notify/scripts/teams_notify.py \
   -- \
   printf 'INFO: mention test complete\n'
 ```
+
+Omit `--webhook` when `TEAMS_WEBHOOK_URL` is set or when `teams-notify/.default_webhook` exists.
 
 Plain `{"text": ...}` messages do not create real Teams activity-feed mentions. A real mention requires the Adaptive Card format above and a webhook endpoint that supports Teams Adaptive Cards with user mentions.
 

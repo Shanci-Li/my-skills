@@ -21,6 +21,7 @@ INFO_RE = re.compile(
     r"(^|\s|\[|\{)(INFO)(\s|:|\]|\}|=|,|$)|level[=:]\s*INFO",
     re.IGNORECASE,
 )
+DEFAULT_WEBHOOK_FILE = Path(__file__).resolve().parents[1] / ".default_webhook"
 
 
 def utc_now() -> dt.datetime:
@@ -62,6 +63,19 @@ def read_info_lines(log_file: Optional[Path]) -> list[str]:
             if INFO_RE.search(line):
                 lines.append(line)
     return lines
+
+
+def default_webhook() -> Optional[str]:
+    value = os.environ.get("TEAMS_WEBHOOK_URL")
+    if value:
+        value = value.strip()
+    if value:
+        return value
+    if DEFAULT_WEBHOOK_FILE.exists():
+        value = DEFAULT_WEBHOOK_FILE.read_text(encoding="utf-8").strip()
+        if value:
+            return value
+    return None
 
 
 def build_text(
@@ -262,8 +276,11 @@ def parse_args(argv: list[str]) -> tuple[argparse.Namespace, list[str]]:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--webhook",
-        default=os.environ.get("TEAMS_WEBHOOK_URL"),
-        help="Teams webhook URL. Defaults to TEAMS_WEBHOOK_URL.",
+        default=default_webhook(),
+        help=(
+            "Teams webhook URL. Defaults to TEAMS_WEBHOOK_URL, then "
+            f"{DEFAULT_WEBHOOK_FILE}."
+        ),
     )
     parser.add_argument("--task-name", default="Codex task")
     parser.add_argument("--log-file", help="Path where command output is captured/read.")

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Teams Notify"
+  short_description: "Monitor command runs and notify Microsoft Teams."
+  default_prompt: "Run a command with Teams notification, including timing and INFO logs."

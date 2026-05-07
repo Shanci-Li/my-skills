@@ -20,14 +20,15 @@ Never hard-code a webhook into repository files. Treat webhooks as secrets.
 1. Identify the task name, command or PID, webhook URL, and where logs should be written.
 2. Prefer wrapping new executions with `scripts/teams_notify.py -- ...` so stdout/stderr are captured from the beginning.
 3. For an already-running process, use `--pid PID --log-file PATH` when a log file exists. If no log file exists, say that full INFO logs cannot be reconstructed for already-emitted output.
-4. Send a Teams notification per task. The final payload must include:
+4. If the user asks to @mention someone, use `--mention-upn <email-or-upn>` and optionally `--mention-name <display-name>`. This switches the script from a plain `{"text": ...}` payload to a Teams Adaptive Card payload with `<at>...</at>` and `msteams.entities`.
+5. Send a Teams notification per task. The final payload must include:
    - `start_time_utc`
    - `end_time_utc`
    - `duration_hh_mm_ss` in `HH/MM/SS`
    - task name
    - exit code when known
    - all captured INFO-level log lines
-5. If external webhook posting needs approval in the current environment, request it with the exact destination and payload class. Do not bypass a rejected approval.
+6. If external webhook posting needs approval in the current environment, request it with the exact destination and payload class. Do not bypass a rejected approval.
 
 ## Script Usage
 
@@ -55,6 +56,20 @@ python /root/.codex/skills/teams-notify/scripts/teams_notify.py \
 ```
 
 If `--started-at` is omitted for PID mode, the watcher start time is used.
+
+Send a notification that @mentions a user by UPN/email:
+
+```bash
+python /root/.codex/skills/teams-notify/scripts/teams_notify.py \
+  --webhook "$TEAMS_WEBHOOK_URL" \
+  --task-name "mention test" \
+  --mention-upn "shanci.li@hes-so.ch" \
+  --mention-name "Shanci Li" \
+  -- \
+  printf 'INFO: mention test complete\n'
+```
+
+Plain `{"text": ...}` messages do not create real Teams activity-feed mentions. A real mention requires the Adaptive Card format above and a webhook endpoint that supports Teams Adaptive Cards with user mentions.
 
 ## INFO Log Handling
 

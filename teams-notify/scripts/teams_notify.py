@@ -101,15 +101,55 @@ def build_text(
     )
 
 
-def post_teams(webhook: str, text: str, timeout: int) -> None:
-    payload = json.dumps({"text": text}).encode("utf-8")
+def teams_payload(args: argparse.Namespace, text: str) -> dict[str, object]:
+    if not args.mention_upn:
+        return {"text": text}
+
+    mention_name = args.mention_name or args.mention_upn
+    mention_text = f"<at>{mention_name}</at>"
+    return {
+        "type": "message",
+        "attachments": [
+            {
+                "contentType": "application/vnd.microsoft.card.adaptive",
+                "content": {
+                    "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
+                    "type": "AdaptiveCard",
+                    "version": "1.2",
+                    "body": [
+                        {
+                            "type": "TextBlock",
+                            "text": f"{mention_text}\n\n{text}",
+                            "wrap": True,
+                        }
+                    ],
+                    "msteams": {
+                        "entities": [
+                            {
+                                "type": "mention",
+                                "text": mention_text,
+                                "mentioned": {
+                                    "id": args.mention_upn,
+                                    "name": mention_name,
+                                },
+                            }
+                        ]
+                    },
+                },
+            }
+        ],
+    }
+
+
+def post_teams(args: argparse.Namespace, text: str) -> None:
+    payload = json.dumps(teams_payload(args, text)).encode("utf-8")
     req = urllib.request.Request(
-        webhook,
+        args.webhook,
         data=payload,
         headers={"Content-Type": "application/json"},
         method="POST",
     )
-    with urllib.request.urlopen(req, timeout=timeout) as resp:
+    with urllib.request.urlopen(req, timeout=args.timeout) as resp:
         resp.read()
 
 
@@ -121,7 +161,7 @@ def run_command(args: argparse.Namespace, command: list[str]) -> int:
 
     if args.notify_start:
         post_teams(
-            args.webhook,
+            args,
             build_text(
                 task_name=args.task_name,
                 status="started",
@@ -131,7 +171,6 @@ def run_command(args: argparse.Namespace, command: list[str]) -> int:
                 info_lines=[],
                 log_file=log_file,
             ),
-            args.timeout,
         )
 
     proc = subprocess.Popen(
@@ -163,7 +202,7 @@ def run_command(args: argparse.Namespace, command: list[str]) -> int:
     info_lines = read_info_lines(log_file)
     status = "succeeded" if exit_code == 0 else "failed"
     post_teams(
-        args.webhook,
+        args,
         build_text(
             task_name=args.task_name,
             status=status,
@@ -173,7 +212,6 @@ def run_command(args: argparse.Namespace, command: list[str]) -> int:
             info_lines=info_lines,
             log_file=log_file,
         ),
-        args.timeout,
     )
     return exit_code
 
@@ -184,7 +222,7 @@ def watch_pid(args: argparse.Namespace) -> int:
 
     if args.notify_start:
         post_teams(
-            args.webhook,
+            args,
             build_text(
                 task_name=args.task_name,
                 status=f"watching PID {args.pid}",
@@ -194,7 +232,6 @@ def watch_pid(args: argparse.Namespace) -> int:
                 info_lines=read_info_lines(log_file),
                 log_file=log_file,
             ),
-            args.timeout,
         )
 
     while subprocess.run(
@@ -207,7 +244,7 @@ def watch_pid(args: argparse.Namespace) -> int:
 
     end = utc_now()
     post_teams(
-        args.webhook,
+        args,
         build_text(
             task_name=args.task_name,
             status=f"PID {args.pid} exited",
@@ -217,7 +254,6 @@ def watch_pid(args: argparse.Namespace) -> int:
             info_lines=read_info_lines(log_file),
             log_file=log_file,
         ),
-        args.timeout,
     )
     return 0
 
@@ -236,6 +272,17 @@ def parse_args(argv: list[str]) -> tuple[argparse.Namespace, list[str]]:
     parser.add_argument("--poll-seconds", type=float, default=60.0)
     parser.add_argument("--timeout", type=int, default=30, help="Webhook timeout seconds.")
     parser.add_argument("--notify-start", action="store_true")
+    parser.add_argument(
+        "--mention-upn",
+        help=(
+            "Mention this Teams user by UPN/email. Enables Adaptive Card payload "
+            "instead of plain text."
+        ),
+    )
+    parser.add_argument(
+        "--mention-name",
+        help="Display name for --mention-upn. Defaults to the UPN/email.",
+    )
     parser.add_argument("command", nargs=argparse.REMAINDER)
     args = parser.parse_args(argv)
 
